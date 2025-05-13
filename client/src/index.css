@@ -1,0 +1,27 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&family=Outfit:wght@100..900&family=Playfair:ital,opsz,wght@0,5..1200,300..900;1,5..1200,300..900&family=Prata&family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&display=swap');
+@import "tailwindcss";
+@theme{
+  --color-primary: #2563EB;
+  --color-secondary: #FBBF24;
+  --color-accent: #F472B6;
+  --color-neutral: #374151;
+  --color-base-100: #FFFFFF;
+}
+*{
+  font-family: Outfit, Montserrat, sans-serif;
+}
+
+.font-playfair {
+  font-family: Playfair, Montserrat, sans-serif;
+}
+.font-prata {
+  font-family: Prata, Montserrat, sans-serif;
+}
+
+/* Add to index.css or globals.css */
+.react-select__control {
+  @apply border border-gray-300 rounded-md shadow-sm hover:border-primary focus:ring-2 focus:ring-primary focus:border-primary;
+}
+.react-select__menu {
+  @apply z-50;
+}
