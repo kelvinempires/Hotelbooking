@@ -11,12 +11,7 @@
   font-family: Outfit, Montserrat, sans-serif;
 }
 
-.font-playfair {
-  font-family: Playfair, Montserrat, sans-serif;
-}
-.font-prata {
-  font-family: Prata, Montserrat, sans-serif;
-}
+
 
 /* Add to index.css or globals.css */
 .react-select__control {
