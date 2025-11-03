@@ -15,7 +15,7 @@ import ListRoom from "./pages/HotelOwner.jsx/ListRoom";
 const App = () => {
   const location = useLocation();
   const isOwnerPage = location.pathname.startsWith("/owner");
-  const showHotelReg = location.pathname === "/";
+  const showHotelReg = location.pathname === "/owner";
   return (
     <div>
       {!isOwnerPage && <Navbar />}
