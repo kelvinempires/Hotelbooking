@@ -13,11 +13,13 @@ import AddRoom from "./pages/HotelOwner.jsx/AddRoom";
 import ListRoom from "./pages/HotelOwner.jsx/ListRoom";
 
 const App = () => {
-  const isOwnerPage = useLocation().pathname.includes("owner");
+  const location = useLocation();
+  const isOwnerPage = location.pathname.startsWith("/owner");
+  const showHotelReg = location.pathname === "/";
   return (
     <div>
       {!isOwnerPage && <Navbar />}
-      {false && <HotelReg />}
+      {showHotelReg && <HotelReg />}
       <div className="min-h-[70vh]">
         <Routes>
           <Route path="/" element={<Home />} />

@@ -1,0 +1,361 @@
+import Room from "../models/Room.js";
+import Hotel from "../models/Hotel.js";
+
+// Get rooms by hotel with availability check
+export const getRoomsByHotel = async (req, res) => {
+  try {
+    const { hotelId } = req.params;
+    const { checkIn, checkOut, guests, roomType } = req.query;
+
+    // Verify hotel exists and is active
+    const hotel = await Hotel.findOne({ _id: hotelId, isActive: true });
+    if (!hotel) {
+      return res.status(404).json({
+        success: false,
+        message: "Hotel not found",
+      });
+    }
+
+    const query = {
+      hotel: hotelId,
+      isAvailable: true,
+      availableRooms: { $gt: 0 },
+    };
+
+    if (roomType) query.roomType = roomType;
+    if (guests) query.maxGuests = { $gte: parseInt(guests) };
+
+    const rooms = await Room.find(query).populate("hotel");
+
+    // Calculate discounted prices
+    const roomsWithDiscount = rooms.map((room) => {
+      const roomObj = room.toObject();
+      roomObj.finalPrice = room.discountedPrice;
+      roomObj.hasDiscount = room.discount.amount > 0;
+      return roomObj;
+    });
+
+    res.json({
+      success: true,
+      data: roomsWithDiscount,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// @desc    Get all rooms
+// @route   GET /api/rooms
+// @access  Public
+export const getRooms = async (req, res) => {
+  try {
+    const {
+      hotel,
+      roomType,
+      minPrice,
+      maxPrice,
+      amenities,
+      guests,
+      page = 1,
+      limit = 10,
+    } = req.query;
+
+    // Build filter object
+    const filter = { isAvailable: true };
+
+    if (hotel) {
+      filter.hotel = hotel;
+    }
+
+    if (roomType) {
+      filter.roomType = { $regex: roomType, $options: "i" };
+    }
+
+    if (minPrice || maxPrice) {
+      filter.pricePerNight = {};
+      if (minPrice) filter.pricePerNight.$gte = parseInt(minPrice);
+      if (maxPrice) filter.pricePerNight.$lte = parseInt(maxPrice);
+    }
+
+    if (amenities) {
+      filter.amenities = { $in: amenities.split(",") };
+    }
+
+    if (guests) {
+      filter.maxGuests = { $gte: parseInt(guests) };
+    }
+
+    const rooms = await Room.find(filter)
+      .populate("hotel", "name address city starRating images")
+      .sort({ pricePerNight: 1 })
+      .skip((parseInt(page) - 1) * parseInt(limit))
+      .limit(parseInt(limit))
+      .select("-__v");
+
+    const total = await Room.countDocuments(filter);
+
+    res.json({
+      success: true,
+      count: rooms.length,
+      total,
+      page: parseInt(page),
+      pages: Math.ceil(total / parseInt(limit)),
+      data: rooms,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Error fetching rooms",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Get single room
+// @route   GET /api/rooms/:id
+// @access  Public
+export const getRoom = async (req, res) => {
+  try {
+    const room = await Room.findById(req.params.id)
+      .populate(
+        "hotel",
+        "name address city phone email amenities policies checkInTime checkOutTime"
+      )
+      .select("-__v");
+
+    if (!room) {
+      return res.status(404).json({
+        success: false,
+        message: "Room not found",
+      });
+    }
+
+    res.json({
+      success: true,
+      data: room,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Error fetching room",
+      error: error.message,
+    });
+  }
+};
+// Create room for hotel (owner only)
+// @route   POST /api/rooms
+// @access  Private/Owner
+export const createRoom = async (req, res) => {
+  try {
+    const { auth } = req;
+    const { hotel } = req.body;
+
+    // Verify hotel exists and user is owner
+    const hotelDoc = await Hotel.findOne({ _id: hotel, isActive: true });
+    if (!hotelDoc) {
+      return res.status(404).json({
+        success: false,
+        message: "Hotel not found",
+      });
+    }
+
+    if (hotelDoc.ownerId !== auth.userId) {
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to add rooms to this hotel",
+      });
+    }
+
+    const room = new Room(req.body);
+    await room.save();
+    await room.populate("hotel");
+
+    res.status(201).json({
+      success: true,
+      data: room,
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// Update room (owner only)
+// @route   PUT /api/rooms/:id
+// @access  Private/Owner
+export const updateRoom = async (req, res) => {
+  try {
+    const { auth } = req;
+    const room = await Room.findById(req.params.id).populate("hotel");
+
+    if (!room) {
+      return res.status(404).json({
+        success: false,
+        message: "Room not found",
+      });
+    }
+
+    if (room.hotel.ownerId !== auth.userId) {
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to update this room",
+      });
+    }
+
+    const updatedRoom = await Room.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+      runValidators: true,
+    }).populate("hotel");
+
+    res.json({
+      success: true,
+      data: updatedRoom,
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// Get rooms by owner
+// @route   GET /api/rooms/hotel/:hotelId
+// @access  Public
+export const getMyRooms = async (req, res) => {
+  try {
+    const { auth } = req;
+    const { page = 1, limit = 10, hotelId } = req.query;
+
+    const query = {};
+
+    // If hotelId is provided, verify ownership
+    if (hotelId) {
+      const hotel = await Hotel.findOne({ _id: hotelId, ownerId: auth.userId });
+      if (!hotel) {
+        return res.status(404).json({
+          success: false,
+          message: "Hotel not found or not owned by you",
+        });
+      }
+      query.hotel = hotelId;
+    } else {
+      // Get all hotels owned by user, then get rooms for those hotels
+      const myHotels = await Hotel.find({ ownerId: auth.userId });
+      const hotelIds = myHotels.map((hotel) => hotel._id);
+      query.hotel = { $in: hotelIds };
+    }
+
+    const rooms = await Room.find(query)
+      .populate("hotel")
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .sort({ createdAt: -1 });
+
+    const total = await Room.countDocuments(query);
+
+    res.json({
+      success: true,
+      data: rooms,
+      pagination: {
+        totalPages: Math.ceil(total / limit),
+        currentPage: parseInt(page),
+        total,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// @desc    Update room availability
+// @route   PATCH /api/rooms/:id/availability
+// @access  Private/Owner
+export const updateRoomAvailability = async (req, res) => {
+  try {
+    const { auth } = req;
+    const { isAvailable, availableRooms } = req.body;
+    const room = await Room.findById(req.params.id).populate("hotel");
+
+    if (!room) {
+      return res.status(404).json({
+        success: false,
+        message: "Room not found",
+      });
+    }
+
+    if (room.hotel.ownerId !== auth.userId) {
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to update this room",
+      });
+    }
+
+    const updateData = {};
+    if (isAvailable !== undefined) updateData.isAvailable = isAvailable;
+    if (availableRooms !== undefined)
+      updateData.availableRooms = availableRooms;
+
+    const updatedRoom = await Room.findByIdAndUpdate(
+      req.params.id,
+      updateData,
+      { new: true }
+    ).select("-__v");
+
+    res.json({
+      success: true,
+      message: "Room availability updated successfully",
+      data: updatedRoom,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Error updating room availability",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Delete room
+// @route   DELETE /api/rooms/:id
+// @access  Private/Owner
+export const deleteRoom = async (req, res) => {
+  try {
+    const { auth } = req;
+    const room = await Room.findById(req.params.id).populate("hotel");
+
+    if (!room) {
+      return res.status(404).json({
+        success: false,
+        message: "Room not found",
+      });
+    }
+
+    if (room.hotel.ownerId !== auth.userId) {
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to update this room",
+      });
+    }
+
+    await Room.findByIdAndDelete(req.params.id);
+
+    res.json({
+      success: true,
+      message: "Room deleted successfully",
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
