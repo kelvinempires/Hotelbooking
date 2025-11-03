@@ -5,7 +5,6 @@ import dotenv from "dotenv";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 
-// ES6 equivalent for __dirname
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
@@ -13,8 +12,16 @@ dotenv.config();
 
 const app = express();
 
-// Middleware
-app.use(cors());
+// CORS configuration for Vite frontend
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL || "http://localhost:5173",
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
+
 app.use(express.json());
 app.use(express.static("public"));
 
@@ -24,6 +31,9 @@ import roomRoutes from "./routes/roomRoutes.js";
 import testimonialRoutes from "./routes/testimonialRoutes.js";
 import offerRoutes from "./routes/offerRoutes.js";
 import newsletterRoutes from "./routes/newsletterRoutes.js";
+import dashboardRoutes from "./routes/dashboardRoutes.js";
+import seedRoutes from "./routes/seedRoutes.js";
+import uploadRoutes from "./routes/uploadRoutes.js";
 
 // Routes
 app.use("/api/hotels", hotelRoutes);
@@ -31,20 +41,23 @@ app.use("/api/rooms", roomRoutes);
 app.use("/api/testimonials", testimonialRoutes);
 app.use("/api/offers", offerRoutes);
 app.use("/api/newsletter", newsletterRoutes);
+app.use("/api/owner", dashboardRoutes);
+app.use("/api/seed", seedRoutes);
+app.use("/api/upload", uploadRoutes);
 
 // Health check
 app.get("/api/health", (req, res) => {
   res.status(200).json({ message: "Server is running!" });
 });
 
+app.get("/", (req, res) => {
+  res.send("Welcome to the Hotel Booking API!");
+});
+
 // Error handling middleware
 app.use((error, req, res, next) => {
   console.error(error);
   res.status(500).json({ message: "Something went wrong!" });
-});
-
-app.get("/", (req, res) => {
-  res.send("Welcome to the Hotel Booking API!");
 });
 
 // 404 handler
@@ -60,6 +73,7 @@ mongoose
     console.log("Connected to MongoDB");
     app.listen(PORT, () => {
       console.log(`Server running at http://localhost:${PORT}`);
+      console.log(`Frontend URL: ${process.env.FRONTEND_URL}`);
     });
   })
   .catch((error) => {

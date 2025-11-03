@@ -11,7 +11,5 @@ export const optionalAuth = (req, res, next) => {
   next();
 };
 
-// Admin middleware - check if user has admin role
-export const admin = ClerkExpressRequireAuth({
-  // You can add role-based authorization here
-});
+// Admin middleware
+export const admin = ClerkExpressRequireAuth();

@@ -5,7 +5,11 @@
   "type": "module",
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon index.js"
+    "dev": "nodemon index.js",
+    "seed": "node seed/seedDatabase.js",
+    "seed:dev": "NODE_ENV=development node seed/seedDatabase.js",
+    "seed:prod": "NODE_ENV=production node seed/seedDatabase.js",
+    "seed:reset": "node seed/seedDatabase.js --reset"
   },
   "keywords": [],
   "author": "",
@@ -17,7 +21,8 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
-    "mongoose": "^8.19.1"
+    "mongoose": "^8.19.1",
+    "multer": "^2.0.2"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"

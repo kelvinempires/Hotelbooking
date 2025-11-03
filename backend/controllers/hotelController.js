@@ -2,8 +2,6 @@ import Hotel from "../models/Hotel.js";
 import Room from "../models/Room.js";
 
 // Get all hotels with filtering and pagination
-// @route   GET /api/hotels
-// @access  Public
 export const getHotels = async (req, res) => {
   try {
     const {
@@ -53,8 +51,6 @@ export const getHotels = async (req, res) => {
 };
 
 // Get single hotel with rooms
-// @route   GET /api/hotels/:id
-// @access  Public
 export const getHotel = async (req, res) => {
   try {
     const hotel = await Hotel.findById(req.params.id);
@@ -66,7 +62,6 @@ export const getHotel = async (req, res) => {
       });
     }
 
-    // Get available rooms for this hotel
     const rooms = await Room.find({
       hotel: req.params.id,
       isAvailable: true,
@@ -88,16 +83,56 @@ export const getHotel = async (req, res) => {
 };
 
 // Create hotel (for owners)
-// @route   POST /api/hotels
-// @access  Private/Owner
 export const createHotel = async (req, res) => {
   try {
-    const { auth } = req;
+    console.log("Auth object:", req.auth);
+    console.log("User ID:", req.auth?.userId);
 
+    // With ClerkExpressRequireAuth, user info is automatically attached to req.auth
+    if (!req.auth || !req.auth.userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Not authenticated. Please log in.",
+      });
+    }
+
+    const { userId } = req.auth;
+
+    // Validate required fields
+    const requiredFields = ["name", "phone", "address", "city", "state"];
+    const missingFields = requiredFields.filter((field) => !req.body[field]);
+
+    if (missingFields.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Missing required fields: ${missingFields.join(", ")}`,
+      });
+    }
+
+    // Create hotel data
     const hotelData = {
-      ...req.body,
-      ownerId: auth.userId,
-      ownerEmail: auth.session?.user?.primaryEmailAddress?.emailAddress,
+      name: req.body.name,
+      phone: req.body.phone,
+      address: req.body.address,
+      city: req.body.city,
+      state: req.body.state,
+      country: req.body.country || "Nigeria",
+      email: req.body.email,
+      ownerId: userId,
+      ownerEmail: req.body.email || req.auth.user?.primaryEmailAddress, // Use provided email or fallback
+      // Set defaults
+      isActive: true,
+      isVerified: false,
+      featured: false,
+      category: "Standard",
+      starRating: 3,
+      checkInTime: "14:00",
+      checkOutTime: "12:00",
+      policies: {
+        cancellation: "Free cancellation up to 24 hours before check-in",
+        pets: false,
+        smoking: false,
+      },
     };
 
     const hotel = new Hotel(hotelData);
@@ -105,20 +140,35 @@ export const createHotel = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: "Hotel created successfully",
+      message: "Hotel registered successfully! It will be reviewed soon.",
       data: hotel,
     });
   } catch (error) {
-    res.status(400).json({
+    console.error("Hotel creation error:", error);
+
+    if (error.name === "ValidationError") {
+      const messages = Object.values(error.errors).map((err) => err.message);
+      return res.status(400).json({
+        success: false,
+        message: messages.join(", "),
+      });
+    }
+
+    if (error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: "Hotel with this name already exists",
+      });
+    }
+
+    res.status(500).json({
       success: false,
-      message: error.message,
+      message: "Server error during hotel registration",
     });
   }
 };
 
 // Update hotel (owner only)
-// @route   PUT /api/hotels/:id
-// @access  Private/Owner
 export const updateHotel = async (req, res) => {
   try {
     const { auth } = req;
@@ -156,9 +206,8 @@ export const updateHotel = async (req, res) => {
     });
   }
 };
-// @desc    Delete hotel
-// @route   DELETE /api/hotels/:id
-// @access  Private/Owner
+
+// Delete hotel
 export const deleteHotel = async (req, res) => {
   try {
     const { auth } = req;
@@ -194,10 +243,7 @@ export const deleteHotel = async (req, res) => {
   }
 };
 
-// @desc    Get hotels by owner
-// @route   GET /api/hotels/owner/my-hotels
-// @access  Private/Owner
-
+// Get hotels by owner
 export const getMyHotels = async (req, res) => {
   try {
     const { auth } = req;
@@ -227,9 +273,7 @@ export const getMyHotels = async (req, res) => {
   }
 };
 
-// @desc    Get featured hotels
-// @route   GET /api/hotels/featured
-// @access  Public
+// Get featured hotels
 export const getFeaturedHotels = async (req, res) => {
   try {
     const hotels = await Hotel.find({
