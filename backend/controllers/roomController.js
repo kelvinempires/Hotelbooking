@@ -114,37 +114,6 @@ export const getRooms = async (req, res) => {
   }
 };
 
-// @desc    Get single room
-// @route   GET /api/rooms/:id
-// @access  Public
-export const getRoom = async (req, res) => {
-  try {
-    const room = await Room.findById(req.params.id)
-      .populate(
-        "hotel",
-        "name address city phone email amenities policies checkInTime checkOutTime"
-      )
-      .select("-__v");
-
-    if (!room) {
-      return res.status(404).json({
-        success: false,
-        message: "Room not found",
-      });
-    }
-
-    res.json({
-      success: true,
-      data: room,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: "Error fetching room",
-      error: error.message,
-    });
-  }
-};
 // Create room for hotel (owner only)
 // @route   POST /api/rooms
 // @access  Private/Owner
@@ -276,6 +245,40 @@ export const getMyRooms = async (req, res) => {
   }
 };
 
+// Add these functions to your existing roomController.js
+
+// @desc    Get single room
+// @route   GET /api/rooms/:id
+// @access  Public
+export const getRoom = async (req, res) => {
+  try {
+    const room = await Room.findById(req.params.id)
+      .populate(
+        "hotel",
+        "name address city phone email amenities policies checkInTime checkOutTime ownerId"
+      )
+      .select("-__v");
+
+    if (!room) {
+      return res.status(404).json({
+        success: false,
+        message: "Room not found",
+      });
+    }
+
+    res.json({
+      success: true,
+      data: room,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Error fetching room",
+      error: error.message,
+    });
+  }
+};
+
 // @desc    Update room availability
 // @route   PATCH /api/rooms/:id/availability
 // @access  Private/Owner
@@ -292,6 +295,7 @@ export const updateRoomAvailability = async (req, res) => {
       });
     }
 
+    // Check if user owns the hotel that this room belongs to
     if (room.hotel.ownerId !== auth.userId) {
       return res.status(403).json({
         success: false,
@@ -301,14 +305,15 @@ export const updateRoomAvailability = async (req, res) => {
 
     const updateData = {};
     if (isAvailable !== undefined) updateData.isAvailable = isAvailable;
-    if (availableRooms !== undefined)
-      updateData.availableRooms = availableRooms;
+    if (availableRooms !== undefined) {
+      updateData.availableRooms = Math.min(availableRooms, room.totalRooms);
+    }
 
     const updatedRoom = await Room.findByIdAndUpdate(
       req.params.id,
       updateData,
-      { new: true }
-    ).select("-__v");
+      { new: true, runValidators: true }
+    ).populate("hotel");
 
     res.json({
       success: true,
@@ -339,10 +344,11 @@ export const deleteRoom = async (req, res) => {
       });
     }
 
+    // Check if user owns the hotel that this room belongs to
     if (room.hotel.ownerId !== auth.userId) {
       return res.status(403).json({
         success: false,
-        message: "Not authorized to update this room",
+        message: "Not authorized to delete this room",
       });
     }
 
@@ -353,9 +359,10 @@ export const deleteRoom = async (req, res) => {
       message: "Room deleted successfully",
     });
   } catch (error) {
-    res.status(400).json({
+    res.status(500).json({
       success: false,
-      message: error.message,
+      message: "Error deleting room",
+      error: error.message,
     });
   }
 };

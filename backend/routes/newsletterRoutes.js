@@ -5,6 +5,7 @@ import {
   updatePreferences,
   unsubscribe,
   getSubscribers,
+  getNewsletterStats,
 } from "../controllers/newsletterController.js";
 import { protect, admin } from "../middleware/auth.js";
 
@@ -18,5 +19,6 @@ router.post("/unsubscribe", unsubscribe);
 
 // Admin routes
 router.get("/subscribers", protect, admin, getSubscribers);
+router.get("/stats", protect, admin, getNewsletterStats); // <-- missing one added
 
 export default router;

@@ -257,7 +257,7 @@ export const validatePromoCode = async (req, res) => {
 // @route   PATCH /api/offers/:id/toggle-active
 // @access  Private/Ownerexport
 
-const toggleOfferActive = async (req, res) => {
+export const toggleOfferActive = async (req, res) => {
   try {
     const { auth } = req;
     const offer = await Offer.findById(req.params.id).populate("hotel");

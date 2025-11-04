@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 import dotenv from "dotenv";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
+import multer from "multer";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -23,7 +24,10 @@ app.use(
 );
 
 app.use(express.json());
+
+// Static folders
 app.use(express.static("public"));
+app.use("/uploads", express.static("public/uploads"));   // <-- this is important for image access
 
 // Import routes
 import hotelRoutes from "./routes/hotelRoutes.js";
@@ -54,10 +58,15 @@ app.get("/", (req, res) => {
   res.send("Welcome to the Hotel Booking API!");
 });
 
-// Error handling middleware
-app.use((error, req, res, next) => {
-  console.error(error);
-  res.status(500).json({ message: "Something went wrong!" });
+// Multer error handler first (so upload errors won't crash)
+app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    return res.status(400).json({ message: err.message });
+  }
+  if (err) {
+    return res.status(500).json({ message: err.message });
+  }
+  next();
 });
 
 // 404 handler
