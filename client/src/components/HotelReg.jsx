@@ -117,7 +117,7 @@ const HotelReg = ({ onClose, onSuccess }) => {
             <img src={assets.closeIcon} alt="closeIcon" className="h-3 w-3" />
           </button>
 
-          <p className="font-semibold text-2xl mt-2 text-center">
+          <p className="font-semibold text-2xl text-center">
             Register Your Hotel
           </p>
 
@@ -129,7 +129,7 @@ const HotelReg = ({ onClose, onSuccess }) => {
           )}
 
           {/* Hotel Name */}
-          <div className="w-full mt-4">
+          <div className="w-full mt-3">
             <label htmlFor="name" className="font-medium text-gray-500">
               Hotel Name *
             </label>
@@ -139,14 +139,14 @@ const HotelReg = ({ onClose, onSuccess }) => {
               placeholder="Enter hotel name"
               value={formData.name}
               onChange={handleChange}
-              className="border border-gray-300 rounded w-full px-3 py-2.5 mt-1 outline-indigo-500 font-light"
+              className="border border-gray-300 rounded w-full px-3 py-1.5 outline-indigo-500 font-light"
               required
               disabled={loading}
             />
           </div>
 
           {/* Phone */}
-          <div className="w-full mt-4">
+          <div className="w-full mt-3">
             <label htmlFor="phone" className="font-medium text-gray-500">
               Phone Number *
             </label>
@@ -156,14 +156,14 @@ const HotelReg = ({ onClose, onSuccess }) => {
               placeholder="Enter phone number"
               value={formData.phone}
               onChange={handleChange}
-              className="border border-gray-300 rounded w-full px-3 py-2.5 mt-1 outline-indigo-500 font-light"
+              className="border border-gray-300 rounded w-full px-3 py-1.5 outline-indigo-500 font-light"
               required
               disabled={loading}
             />
           </div>
 
           {/* Email */}
-          <div className="w-full mt-4">
+          <div className="w-full mt-3">
             <label htmlFor="email" className="font-medium text-gray-500">
               Contact Email
             </label>
@@ -173,7 +173,7 @@ const HotelReg = ({ onClose, onSuccess }) => {
               placeholder="Enter contact email"
               value={formData.email}
               onChange={handleChange}
-              className="border border-gray-300 rounded w-full px-3 py-2.5 mt-1 outline-indigo-500 font-light"
+              className="border border-gray-300 rounded w-full px-3 py-1.5 outline-indigo-500 font-light"
               disabled={loading}
             />
             <p className="text-xs text-gray-400 mt-1">
@@ -184,7 +184,7 @@ const HotelReg = ({ onClose, onSuccess }) => {
           </div>
 
           {/* Address */}
-          <div className="w-full mt-4">
+          <div className="w-full mt-3">
             <label htmlFor="address" className="font-medium text-gray-500">
               Address *
             </label>
@@ -194,7 +194,7 @@ const HotelReg = ({ onClose, onSuccess }) => {
               placeholder="Enter full address"
               value={formData.address}
               onChange={handleChange}
-              className="border border-gray-300 rounded w-full px-3 py-2.5 mt-1 outline-indigo-500 font-light"
+              className="border border-gray-300 rounded w-full px-3 py-1.5 outline-indigo-500 font-light"
               required
               disabled={loading}
             />
@@ -210,7 +210,7 @@ const HotelReg = ({ onClose, onSuccess }) => {
                 id="city"
                 value={formData.city}
                 onChange={handleChange}
-                className="border border-gray-300 rounded w-full px-3 py-2.5 mt-1 outline-indigo-500 font-light"
+                className="border border-gray-300 rounded w-full px-3 py-1.5  outline-indigo-500 font-light"
                 required
                 disabled={loading}
               >
@@ -234,18 +234,18 @@ const HotelReg = ({ onClose, onSuccess }) => {
                 placeholder="Enter state"
                 value={formData.state}
                 onChange={handleChange}
-                className="border border-gray-300 rounded w-full px-3 py-2.5 mt-1 outline-indigo-500 font-light"
+                className="border border-gray-300 rounded w-full px-3 py-1 outline-indigo-500 font-light"
                 required
                 disabled={loading}
               />
             </div>
           </div>
 
-          <div className="flex gap-4 w-full mt-6">
+          <div className="flex gap-4 w-full mt-3">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 border border-gray-300 text-gray-700 px-6 py-2.5 rounded cursor-pointer hover:bg-gray-50 transition-all"
+              className="flex-1 border border-gray-300 text-gray-700 px-6 py-1 rounded cursor-pointer hover:bg-gray-50 transition-all"
               disabled={loading}
             >
               Cancel
@@ -253,7 +253,7 @@ const HotelReg = ({ onClose, onSuccess }) => {
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 bg-indigo-500 hover:bg-indigo-600 disabled:bg-indigo-300 transition-all text-white px-6 py-2.5 rounded cursor-pointer flex items-center justify-center"
+              className="flex-1 bg-indigo-500 hover:bg-indigo-600 disabled:bg-indigo-300 transition-all text-white px-6 py-1.5 rounded cursor-pointer flex items-center justify-center"
             >
               {loading ? (
                 <>
@@ -285,7 +285,7 @@ const HotelReg = ({ onClose, onSuccess }) => {
             </button>
           </div>
 
-          <p className="text-xs text-gray-400 mt-4 text-center">
+          <p className="text-xs text-gray-400 mt-3 text-center">
             * Required fields. Your hotel will be reviewed before going live.
           </p>
         </div>
