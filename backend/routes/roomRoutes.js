@@ -7,13 +7,15 @@ import {
   getMyRooms,
   getRoom, // Add this
   updateRoomAvailability, // Add this
-  deleteRoom, // Add this
+  deleteRoom,
+  getRooms, // Add this
 } from "../controllers/roomController.js";
 import { protect } from "../middleware/auth.js";
 
 const router = express.Router();
 
 // Public routes
+router.get("/", getRooms);
 router.get("/hotel/:hotelId", getRoomsByHotel);
 
 // Protected routes
