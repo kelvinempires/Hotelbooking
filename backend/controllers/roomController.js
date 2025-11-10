@@ -1,11 +1,23 @@
 import Room from "../models/Room.js";
 import Hotel from "../models/Hotel.js";
+import Testimonial from "../models/Testimonial.js";
 
-// Get rooms by hotel with availability check
+
+// @desc    Get rooms by hotel with availability, ratings, and discounts
+// @route   GET /api/rooms/hotel/:hotelId
+// @access  Public
 export const getRoomsByHotel = async (req, res) => {
   try {
     const { hotelId } = req.params;
-    const { checkIn, checkOut, guests, roomType } = req.query;
+    const {
+      checkIn,
+      checkOut,
+      guests,
+      roomType,
+      sort = "newest",
+      page = 1,
+      limit = 10,
+    } = req.query;
 
     // Verify hotel exists and is active
     const hotel = await Hotel.findOne({ _id: hotelId, isActive: true });
@@ -16,38 +28,120 @@ export const getRoomsByHotel = async (req, res) => {
       });
     }
 
-    const query = {
+    const filter = {
       hotel: hotelId,
       isAvailable: true,
       availableRooms: { $gt: 0 },
     };
 
-    if (roomType) query.roomType = roomType;
-    if (guests) query.maxGuests = { $gte: parseInt(guests) };
+    if (roomType) filter.roomType = { $regex: roomType, $options: "i" };
+    if (guests) filter.maxGuests = { $gte: parseInt(guests) };
 
-    const rooms = await Room.find(query).populate("hotel");
+    // Sorting
+    let sortOption = { createdAt: -1 }; // default = newest
+    if (sort === "priceAsc") sortOption = { pricePerNight: 1 };
+    if (sort === "priceDesc") sortOption = { pricePerNight: -1 };
 
-    // Calculate discounted prices
-    const roomsWithDiscount = rooms.map((room) => {
-      const roomObj = room.toObject();
-      roomObj.finalPrice = room.discountedPrice;
-      roomObj.hasDiscount = room.discount.amount > 0;
-      return roomObj;
-    });
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // Aggregation pipeline
+    const roomsAggregate = await Room.aggregate([
+      { $match: filter },
+      // Lookup hotel info
+      {
+        $lookup: {
+          from: "hotels",
+          localField: "hotel",
+          foreignField: "_id",
+          as: "hotel",
+        },
+      },
+      { $unwind: "$hotel" },
+      // Lookup testimonials for this room
+      {
+        $lookup: {
+          from: "testimonials",
+          let: { roomId: "$_id" },
+          pipeline: [
+            {
+              $match: {
+                $expr: { $eq: ["$room", "$$roomId"] },
+                isApproved: true,
+              },
+            },
+            {
+              $group: {
+                _id: "$room",
+                avgRating: { $avg: "$rating" },
+                totalReviews: { $sum: 1 },
+              },
+            },
+          ],
+          as: "reviews",
+        },
+      },
+      {
+        $addFields: {
+          avgRating: {
+            $ifNull: [{ $arrayElemAt: ["$reviews.avgRating", 0] }, 0],
+          },
+          totalReviews: {
+            $ifNull: [{ $arrayElemAt: ["$reviews.totalReviews", 0] }, 0],
+          },
+          finalPrice: {
+            $cond: [
+              { $gt: ["$discount.amount", 0] },
+              {
+                $cond: [
+                  { $eq: ["$discount.type", "percentage"] },
+                  {
+                    $multiply: [
+                      "$pricePerNight",
+                      {
+                        $subtract: [1, { $divide: ["$discount.amount", 100] }],
+                      },
+                    ],
+                  },
+                  {
+                    $max: [
+                      0,
+                      { $subtract: ["$pricePerNight", "$discount.amount"] },
+                    ],
+                  },
+                ],
+              },
+              "$pricePerNight",
+            ],
+          },
+          hasDiscount: { $gt: ["$discount.amount", 0] },
+        },
+      },
+      { $project: { reviews: 0, __v: 0 } },
+      { $sort: sortOption },
+      { $skip: skip },
+      { $limit: parseInt(limit) },
+    ]);
+
+    const total = await Room.countDocuments(filter);
 
     res.json({
       success: true,
-      data: roomsWithDiscount,
+      count: roomsAggregate.length,
+      total,
+      page: parseInt(page),
+      pages: Math.ceil(total / parseInt(limit)),
+      data: roomsAggregate,
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message,
+      message: "Error fetching rooms",
+      error: error.message,
     });
   }
 };
 
-// @desc    Get all rooms
+// @desc    Get all rooms with filters, sorting, pagination, and ratings
 // @route   GET /api/rooms
 // @access  Public
 export const getRooms = async (req, res) => {
@@ -59,51 +153,118 @@ export const getRooms = async (req, res) => {
       maxPrice,
       amenities,
       guests,
+      sort = "newest",
       page = 1,
       limit = 10,
     } = req.query;
 
-    // Build filter object
     const filter = { isAvailable: true };
 
-    if (hotel) {
-      filter.hotel = hotel;
-    }
-
-    if (roomType) {
-      filter.roomType = { $regex: roomType, $options: "i" };
-    }
-
+    if (hotel) filter.hotel = hotel;
+    if (roomType) filter.roomType = { $regex: roomType, $options: "i" };
     if (minPrice || maxPrice) {
       filter.pricePerNight = {};
       if (minPrice) filter.pricePerNight.$gte = parseInt(minPrice);
       if (maxPrice) filter.pricePerNight.$lte = parseInt(maxPrice);
     }
+    if (amenities) filter.amenities = { $in: amenities.split(",") };
+    if (guests) filter.maxGuests = { $gte: parseInt(guests) };
 
-    if (amenities) {
-      filter.amenities = { $in: amenities.split(",") };
-    }
+    // Sorting
+    let sortOption = { createdAt: -1 }; // default = newest
+    if (sort === "priceAsc") sortOption = { pricePerNight: 1 };
+    if (sort === "priceDesc") sortOption = { pricePerNight: -1 };
 
-    if (guests) {
-      filter.maxGuests = { $gte: parseInt(guests) };
-    }
+    const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    const rooms = await Room.find(filter)
-      .populate("hotel", "name address city starRating images")
-      .sort({ pricePerNight: 1 })
-      .skip((parseInt(page) - 1) * parseInt(limit))
-      .limit(parseInt(limit))
-      .select("-__v");
+    // Aggregation pipeline
+    const roomsAggregate = await Room.aggregate([
+      { $match: filter },
+      // Lookup hotel info
+      {
+        $lookup: {
+          from: "hotels",
+          localField: "hotel",
+          foreignField: "_id",
+          as: "hotel",
+        },
+      },
+      { $unwind: "$hotel" },
+      // Lookup testimonials
+      {
+        $lookup: {
+          from: "testimonials",
+          let: { roomId: "$_id" },
+          pipeline: [
+            {
+              $match: {
+                $expr: { $eq: ["$room", "$$roomId"] },
+                isApproved: true,
+              },
+            },
+            {
+              $group: {
+                _id: "$room",
+                avgRating: { $avg: "$rating" },
+                totalReviews: { $sum: 1 },
+              },
+            },
+          ],
+          as: "reviews",
+        },
+      },
+      {
+        $addFields: {
+          avgRating: {
+            $ifNull: [{ $arrayElemAt: ["$reviews.avgRating", 0] }, 0],
+          },
+          totalReviews: {
+            $ifNull: [{ $arrayElemAt: ["$reviews.totalReviews", 0] }, 0],
+          },
+          finalPrice: {
+            $cond: [
+              { $gt: ["$discount.amount", 0] },
+              {
+                $cond: [
+                  { $eq: ["$discount.type", "percentage"] },
+                  {
+                    $multiply: [
+                      "$pricePerNight",
+                      {
+                        $subtract: [1, { $divide: ["$discount.amount", 100] }],
+                      },
+                    ],
+                  },
+                  {
+                    $max: [
+                      0,
+                      { $subtract: ["$pricePerNight", "$discount.amount"] },
+                    ],
+                  },
+                ],
+              },
+              "$pricePerNight",
+            ],
+          },
+          hasDiscount: { $gt: ["$discount.amount", 0] },
+        },
+      },
+      // Remove internal fields
+      { $project: { reviews: 0, __v: 0 } },
+      { $sort: sortOption },
+      { $skip: skip },
+      { $limit: parseInt(limit) },
+    ]);
 
     const total = await Room.countDocuments(filter);
 
     res.json({
       success: true,
-      count: rooms.length,
+      count: roomsAggregate.length,
       total,
       page: parseInt(page),
       pages: Math.ceil(total / parseInt(limit)),
-      data: rooms,
+      data: roomsAggregate,
     });
   } catch (error) {
     res.status(500).json({
@@ -113,6 +274,7 @@ export const getRooms = async (req, res) => {
     });
   }
 };
+
 
 // Create room for hotel (owner only)
 // @route   POST /api/rooms
