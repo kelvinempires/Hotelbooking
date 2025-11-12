@@ -1,6 +1,8 @@
 import Room from "../models/Room.js";
 import Hotel from "../models/Hotel.js";
 import Testimonial from "../models/Testimonial.js";
+import mongoose from "mongoose";
+
 
 
 // @desc    Get rooms by hotel with availability, ratings, and discounts
@@ -407,32 +409,82 @@ export const getMyRooms = async (req, res) => {
   }
 };
 
-// Add these functions to your existing roomController.js
-
-// @desc    Get single room
-// @route   GET /api/rooms/:id
-// @access  Public
+// @desc Get single room
+// @route GET /api/rooms/:id
+// @access Public
 export const getRoom = async (req, res) => {
   try {
-    const room = await Room.findById(req.params.id)
-      .populate(
-        "hotel",
-        "name address city phone email amenities policies checkInTime checkOutTime ownerId"
-      )
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid room ID" });
+    }
+
+    // Populate hotel and nested owner safely
+    const room = await Room.findById(id)
+      .populate({
+        path: "hotel",
+        select: "name address city ownerId",
+        populate: {
+          path: "owner",
+          select: "name email image",
+          options: { strictPopulate: false }, // prevents error if owner missing
+        },
+      })
       .select("-__v");
 
     if (!room) {
-      return res.status(404).json({
-        success: false,
-        message: "Room not found",
-      });
+      return res
+        .status(404)
+        .json({ success: false, message: "Room not found" });
+    }
+
+    const roomObj = room.toObject();
+
+    // Get approved testimonials, safely populate users
+    const testimonials = await Testimonial.find({
+      room: id,
+      isApproved: true,
+    }).populate({
+      path: "user",
+      select: "name",
+      options: { strictPopulate: false },
+    });
+
+    const totalReviews = testimonials.length;
+    const avgRating = totalReviews
+      ? testimonials.reduce((sum, t) => sum + (t.rating || 0), 0) / totalReviews
+      : 0;
+
+    // Safe discount calculation
+    const discount = roomObj.discount || { amount: 0, type: "fixed" };
+    let discountedPrice = roomObj.pricePerNight;
+    let hasDiscount = false;
+
+    if (discount.amount > 0) {
+      hasDiscount = true;
+      discountedPrice =
+        discount.type === "percentage"
+          ? roomObj.pricePerNight * (1 - discount.amount / 100)
+          : Math.max(0, roomObj.pricePerNight - discount.amount);
     }
 
     res.json({
       success: true,
-      data: room,
+      data: {
+        ...roomObj,
+        hotelOwner: roomObj.hotel?.owner || null,
+        avgRating: parseFloat(avgRating.toFixed(1)),
+        totalReviews,
+        discountedPrice: Math.round(discountedPrice),
+        hasDiscount,
+        reviews: testimonials,
+      },
     });
   } catch (error) {
+    console.error("Error in getRoom:", error);
     res.status(500).json({
       success: false,
       message: "Error fetching room",
@@ -440,6 +492,99 @@ export const getRoom = async (req, res) => {
     });
   }
 };
+
+
+export const checkRoomAvailability = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { checkIn, checkOut, guests } = req.body;
+
+    // Validate room ID
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: "Invalid room ID" });
+    }
+
+    const room = await Room.findById(id);
+
+    if (!room) {
+      return res.status(404).json({ success: false, message: "Room not found" });
+    }
+
+    // Check number of guests
+    if (guests > room.maxGuests) {
+      return res.status(400).json({ success: false, message: "Too many guests for this room" });
+    }
+
+    // TODO: Integrate booking dates if you have bookings collection
+    // For now, just check availableRooms
+    if (!room.isAvailable || room.availableRooms <= 0) {
+      return res.status(400).json({ success: false, message: "Room not available" });
+    }
+
+    // Calculate total nights and total price
+    const checkInDate = new Date(checkIn);
+    const checkOutDate = new Date(checkOut);
+    const nights = Math.ceil((checkOutDate - checkInDate) / (1000 * 60 * 60 * 24));
+
+    if (nights <= 0) {
+      return res.status(400).json({ success: false, message: "Invalid check-in/check-out dates" });
+    }
+
+    let finalPrice = room.pricePerNight;
+
+    if (room.discount && room.discount.amount > 0) {
+      if (room.discount.type === "percentage") {
+        finalPrice = room.pricePerNight * (1 - room.discount.amount / 100);
+      } else {
+        finalPrice = Math.max(0, room.pricePerNight - room.discount.amount);
+      }
+    }
+
+    const totalPrice = finalPrice * nights;
+
+    res.json({
+      success: true,
+      data: {
+        isAvailable: true,
+        nights,
+        totalPrice,
+      },
+    });
+  } catch (error) {
+    console.error("Error in checkRoomAvailability:", error);
+    res.status(500).json({ success: false, message: "Server error", error: error.message });
+  }
+};
+
+
+// export const getRoom = async (req, res) => {
+//   try {
+//     const room = await Room.findById(req.params.id)
+//       .populate(
+//         "hotel",
+//         "name address city phone email amenities policies checkInTime checkOutTime ownerId"
+//       )
+//       .select("-__v");
+
+//     if (!room) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Room not found",
+//       });
+//     }
+
+//     res.json({
+//       success: true,
+//       data: room,
+//     });
+//   } catch (error) {
+//     res.status(500).json({
+//       success: false,
+//       message: "Error fetching room",
+//       error: error.message,
+//     });
+//   }
+// };
 
 // @desc    Update room availability
 // @route   PATCH /api/rooms/:id/availability
@@ -490,6 +635,63 @@ export const updateRoomAvailability = async (req, res) => {
     });
   }
 };
+
+// @desc Add review to room
+// @route POST /api/rooms/:id/reviews
+// @access Private
+export const addRoomReview = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { rating, comment } = req.body;
+    const userId = req.auth.userId;
+
+    // Verify room exists
+    const room = await Room.findById(id);
+    if (!room) {
+      return res.status(404).json({
+        success: false,
+        message: "Room not found",
+      });
+    }
+
+    // Check if user already reviewed this room
+    const existingReview = await Testimonial.findOne({
+      room: id,
+      user: userId,
+    });
+
+    if (existingReview) {
+      return res.status(400).json({
+        success: false,
+        message: "You have already reviewed this room",
+      });
+    }
+
+    // Create testimonial
+    const testimonial = new Testimonial({
+      room: id,
+      user: userId,
+      rating,
+      comment,
+      isApproved: false, // Set to false for moderation
+    });
+
+    await testimonial.save();
+    await testimonial.populate("user", "name");
+
+    res.status(201).json({
+      success: true,
+      data: testimonial,
+      message: "Review submitted for approval",
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
 
 // @desc    Delete room
 // @route   DELETE /api/rooms/:id

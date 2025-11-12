@@ -32,6 +32,7 @@ app.use("/uploads", express.static("public/uploads"));   // <-- this is importan
 // Import routes
 import hotelRoutes from "./routes/hotelRoutes.js";
 import roomRoutes from "./routes/roomRoutes.js";
+import bookingRoutes from "./routes/bookingRoutes.js";
 import testimonialRoutes from "./routes/testimonialRoutes.js";
 import offerRoutes from "./routes/offerRoutes.js";
 import newsletterRoutes from "./routes/newsletterRoutes.js";
@@ -48,6 +49,7 @@ app.use("/api/newsletter", newsletterRoutes);
 app.use("/api/owner", dashboardRoutes);
 app.use("/api/seed", seedRoutes);
 app.use("/api/upload", uploadRoutes);
+app.use("/api/bookings",bookingRoutes);
 
 // Health check
 app.get("/api/health", (req, res) => {
