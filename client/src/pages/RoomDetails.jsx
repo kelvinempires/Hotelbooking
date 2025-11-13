@@ -22,6 +22,8 @@ const RoomDetails = () => {
   const [checkIn, setCheckIn] = useState("");
   const [checkOut, setCheckOut] = useState("");
   const [guests, setGuests] = useState(1);
+  const [guestName, setGuestName] = useState(user?.firstName || "");
+  const [guestPhone, setGuestPhone] = useState(user?.phoneNumber || "");
   const [specialRequests, setSpecialRequests] = useState("");
   const [availabilityResult, setAvailabilityResult] = useState(null);
   const [checking, setChecking] = useState(false);
@@ -38,7 +40,7 @@ const RoomDetails = () => {
           `${import.meta.env.VITE_API_URL}/api/rooms/${id}`
         );
 
-        if (res.data && res.data.success && res.data.data) {
+        if (res.data?.success && res.data.data) {
           setRoom(res.data.data);
           setMainImage(res.data.data.images?.[0]?.url || null);
         } else {
@@ -48,10 +50,7 @@ const RoomDetails = () => {
         if (err.response?.status === 404) setError("Room not found");
         else if (err.response?.status === 500)
           setError("Server error. Please try again later.");
-        else
-          setError(
-            err.response?.data?.message || err.message || "Failed to fetch room"
-          );
+        else setError(err.response?.data?.message || err.message);
       } finally {
         setLoading(false);
       }
@@ -64,53 +63,40 @@ const RoomDetails = () => {
     }
   }, [id]);
 
-  // Helper: compute nights between checkIn and checkOut (integer)
+  // Compute nights between checkIn and checkOut
   const nights = useMemo(() => {
     if (!checkIn || !checkOut) return 0;
-    try {
-      const inDate = new Date(checkIn + "T00:00:00");
-      const outDate = new Date(checkOut + "T00:00:00");
-      const diff = outDate.getTime() - inDate.getTime();
-      if (isNaN(diff) || diff <= 0) return 0;
-      return Math.round(diff / MS_PER_DAY);
-    } catch {
-      return 0;
-    }
+    const inDate = new Date(checkIn + "T00:00:00");
+    const outDate = new Date(checkOut + "T00:00:00");
+    const diff = outDate.getTime() - inDate.getTime();
+    if (isNaN(diff) || diff <= 0) return 0;
+    return Math.round(diff / MS_PER_DAY);
   }, [checkIn, checkOut]);
 
-  // Client-side calculated price (considers discount shown on the room object)
+  // Client-side total price
   const clientTotalPrice = useMemo(() => {
     if (!room || nights <= 0) return 0;
-    // use discountedPrice if present in room else pricePerNight
     const unit = room.discountedPrice ?? room.pricePerNight ?? 0;
     return Math.round(unit * nights);
   }, [room, nights]);
 
-  // Clear previous availability result when user edits dates/guests
+  // Clear availability when input changes
   useEffect(() => {
     setAvailabilityResult(null);
   }, [checkIn, checkOut, guests]);
 
-  // Handle Availability Check (server validation)
+  // Handle server-side availability check
   const handleCheckAvailability = async (e) => {
     e.preventDefault();
 
-    // Basic client-side validation
-    if (!checkIn || !checkOut) {
-      setAvailabilityResult({ error: "Select check-in and check-out dates" });
+    if (!checkIn || !checkOut || nights <= 0) {
+      setAvailabilityResult({ error: "Check-in/out dates are invalid" });
       return;
     }
-    if (nights <= 0) {
-      setAvailabilityResult({ error: "Check-out must be after check-in" });
-      return;
-    }
-    if (Number(guests) < 1) {
-      setAvailabilityResult({ error: "Guests must be at least 1" });
-      return;
-    }
-    if (Number(guests) > (room?.maxGuests ?? 1000)) {
+
+    if (Number(guests) < 1 || Number(guests) > (room?.maxGuests ?? 1000)) {
       setAvailabilityResult({
-        error: `Max guests for this room: ${room?.maxGuests ?? "N/A"}`,
+        error: `Guests must be between 1 and ${room?.maxGuests ?? 1000}`,
       });
       return;
     }
@@ -125,56 +111,85 @@ const RoomDetails = () => {
       );
 
       if (res.data?.success) {
-        // prefer server-calculated totals but also include client totals for fallback
         setAvailabilityResult({
           ...res.data.data,
-          totalPrice:
-            res.data.data.totalPrice ?? clientTotalPrice ?? res.data.data.total,
+          totalPrice: res.data.data.totalPrice ?? clientTotalPrice,
         });
       } else {
-        setAvailabilityResult({
-          error: res.data?.message || "Room not available",
-        });
+        setAvailabilityResult({ error: res.data?.message || "Not available" });
       }
     } catch (err) {
       setAvailabilityResult({
-        error:
-          err.response?.data?.message ||
-          err.message ||
-          "Availability check failed",
+        error: err.response?.data?.message || err.message,
       });
     } finally {
       setChecking(false);
     }
   };
 
-  // Handle Booking (authenticated - uses Clerk token)
+  // Handle booking
   const handleBooking = async () => {
     // Must have availability result (server validated) and dates set
     if (!availabilityResult || !availabilityResult.nights) {
       alert("Please check availability first.");
       return;
     }
+    if (!room?.hotel?._id) {
+      alert("Hotel information missing. Cannot proceed with booking.");
+      return;
+    }
+
+    const guestName =
+      `${user?.firstName ?? ""} ${user?.lastName ?? ""}`.trim() || "Guest";
+    const guestEmail = user?.primaryEmailAddress?.emailAddress;
+    // const guestPhone = user?.phoneNumber || "";
+
+    if (!guestEmail) {
+      alert("User email not found. Please make sure you are logged in.");
+      return;
+    }
+
+    if (!guestPhone.trim()) {
+      alert("Please enter your phone number before booking.");
+      return;
+    }
+     if (!guestName || !guestPhone) {
+       alert("Guest name and phone are required.");
+       return;
+     }
+
+     // Normalize Nigerian phone numbers
+     let normalizedPhone = guestPhone.trim();
+     if (normalizedPhone.startsWith("0"))
+       normalizedPhone = "+234" + normalizedPhone.slice(1);
+     else if (normalizedPhone.startsWith("234"))
+       normalizedPhone = "+" + normalizedPhone;
+
+
+    const nightsCount = availabilityResult?.nights || nights;
+    const totalPrice = availabilityResult?.totalPrice ?? clientTotalPrice;
+
+    const payload = {
+      room: id,
+      hotel: room.hotel._id,
+      guestName,
+      guestEmail: user?.primaryEmailAddress?.emailAddress,
+      guestPhone: normalizedPhone,
+      checkInDate: checkIn,
+      checkOutDate: checkOut,
+      nights: nightsCount,
+      totalPrice,
+      guests: Number(guests),
+      specialRequests: specialRequests.trim(),
+      paymentMethod: "card",
+    };
+
+    console.log("Booking Payload:", payload); // ✅ debug the payload
 
     setBooking(true);
 
     try {
       const token = await getToken();
-
-      const payload = {
-        room: id,
-        hotel: room?.hotel?._id,
-        guestName:
-          `${user?.firstName ?? ""} ${user?.lastName ?? ""}`.trim() || "Guest",
-        guestEmail: user?.primaryEmailAddress?.emailAddress,
-        guestPhone: user?.phoneNumber || "",
-        checkInDate: checkIn,
-        checkOutDate: checkOut,
-        nights: availabilityResult.nights,
-        totalAmount: availabilityResult.totalPrice ?? clientTotalPrice,
-        specialRequests: specialRequests.trim(),
-        paymentMethod: "card",
-      };
 
       const res = await axios.post(
         `${import.meta.env.VITE_API_URL}/api/bookings`,
@@ -183,7 +198,6 @@ const RoomDetails = () => {
       );
 
       if (res.data?.success) {
-        // redirect to my-bookings and optionally show toast
         navigate("/my-bookings");
       } else {
         alert(res.data?.message || "Booking failed");
@@ -224,7 +238,6 @@ const RoomDetails = () => {
       </div>
     );
 
-  // destructure safely
   const {
     hotel = {},
     roomType = "Unknown Room Type",
@@ -242,8 +255,7 @@ const RoomDetails = () => {
   } = room ?? {};
 
   const displayPrice = discountedPrice ?? pricePerNight;
-  const currentDiscount = discount || {};
-  const currentHasDiscount = hasDiscount || currentDiscount.amount > 0;
+  
 
   return (
     <div className="py-28 md:py-35 px-4 md:px-16 lg:px-24 xl:px-32">
@@ -253,11 +265,11 @@ const RoomDetails = () => {
           {hotel.name || "Unknown Hotel"}{" "}
           <span className="font-inter text-sm">({roomType})</span>
         </h1>
-        {currentHasDiscount && (
+        {hasDiscount && discount?.amount > 0 && (
           <p className="text-sm font-inter py-1.5 px-3 text-white bg-orange-500 rounded-full">
-            {currentDiscount.type === "percentage"
-              ? `${currentDiscount.amount}% OFF`
-              : `₦${currentDiscount.amount} OFF`}
+            {discount.type === "percentage"
+              ? `${discount.amount}% OFF`
+              : `₦${discount.amount} OFF`}
           </p>
         )}
       </div>
@@ -338,7 +350,7 @@ const RoomDetails = () => {
         </div>
 
         <div className="flex items-center gap-2 md:w-1/3 justify-end">
-          {currentHasDiscount && (
+          {hasDiscount && discount?.amount > 0 && (
             <p className="text-lg text-gray-500 line-through">
               ₦{pricePerNight.toLocaleString()}
             </p>
@@ -415,7 +427,6 @@ const RoomDetails = () => {
         </div>
 
         <div className="flex flex-col items-end gap-3">
-          {/* Instant client-side price preview */}
           <div className="text-right">
             {nights <= 0 ? (
               <p className="text-sm text-gray-500">
@@ -471,12 +482,26 @@ const RoomDetails = () => {
             </div>
 
             <div className="flex gap-2">
-              <button
-                onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-                className="px-4 py-2 border rounded"
-              >
-                Edit
-              </button>
+              <div className="flex flex-col w-full md:w-auto">
+                <label className="font-medium">Guest Name</label>
+                <input
+                  type="text"
+                  value={guestName}
+                  onChange={(e) => setGuestName(e.target.value)}
+                  className="rounded border border-gray-300 px-3 py-2 mt-1.5 outline-none w-full md:w-60"
+                  required
+                />
+              </div>
+              <div className="flex flex-col w-full md:w-auto">
+                <label className="font-medium">Guest Phone</label>
+                <input
+                  type="tel"
+                  value={guestPhone}
+                  onChange={(e) => setGuestPhone(e.target.value)}
+                  className="rounded border border-gray-300 px-3 py-2 mt-1.5 outline-none w-full md:w-60"
+                  required
+                />
+              </div>
               <button
                 onClick={handleBooking}
                 disabled={booking}
