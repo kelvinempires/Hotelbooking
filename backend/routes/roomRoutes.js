@@ -21,7 +21,7 @@ router.get("/", getRooms);
 router.get("/hotel/:hotelId", getRoomsByHotel);
 
 // Protected routes
-router.get("/owner/my-rooms", protect, getMyRooms); // <-- should come BEFORE any ":id"
+// router.get("/owner/my-rooms", protect, getMyRooms); // <-- should come BEFORE any ":id"
 router.get("/:id", getRoom); // <-- public single room details
 router.post("/:id/reviews", protect, addRoomReview);
 router.post("/", protect, createRoom);

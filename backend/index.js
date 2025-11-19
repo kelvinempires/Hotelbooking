@@ -5,13 +5,17 @@ import dotenv from "dotenv";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 import multer from "multer";
+import { clerkMiddleware } from "@clerk/express";   // <-- ADD THIS
 
+dotenv.config();
+console.log("Clerk Secret Key:", process.env.CLERK_SECRET_KEY);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-dotenv.config();
 
 const app = express();
+
+app.use(clerkMiddleware());
 
 // CORS configuration for Vite frontend
 app.use(

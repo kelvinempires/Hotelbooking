@@ -1,15 +1,23 @@
-import { ClerkExpressRequireAuth } from "@clerk/clerk-sdk-node";
+// middleware/auth.js
+import { clerkMiddleware, getAuth } from "@clerk/express";
 
-// Protect routes with Clerk authentication
-export const protect = ClerkExpressRequireAuth();
+// Attach auth data (req.auth)
+export const optionalAuth = clerkMiddleware();
 
-// Optional auth middleware
-export const optionalAuth = (req, res, next) => {
-  if (req.headers.authorization) {
-    return ClerkExpressRequireAuth()(req, res, next);
+// Protect middleware
+export const protect = (req, res, next) => {
+  const auth = getAuth(req);
+  if (!auth?.userId) {
+    return res.status(401).json({ message: "Not authorized" });
   }
   next();
 };
 
-// Admin middleware
-export const admin = ClerkExpressRequireAuth();
+// Admin middleware (same for now)
+export const admin = (req, res, next) => {
+  const auth = getAuth(req);
+  if (!auth?.userId) {
+    return res.status(401).json({ message: "Admin access denied" });
+  }
+  next();
+};
