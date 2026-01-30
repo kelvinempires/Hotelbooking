@@ -84,30 +84,38 @@ export const getRoomsByHotel = async (req, res) => {
       },
       {
         $addFields: {
-          avgRating: {
-            $ifNull: [{ $arrayElemAt: ["$reviews.avgRating", 0] }, 0],
+          discountSafe: {
+            $cond: [
+              { $or: [{ $eq: ["$discount", null] }, { $not: ["$discount"] }] },
+              { amount: 0, type: "fixed" },
+              "$discount",
+            ],
           },
-          totalReviews: {
-            $ifNull: [{ $arrayElemAt: ["$reviews.totalReviews", 0] }, 0],
-          },
+        },
+      },
+      {
+        $addFields: {
           finalPrice: {
             $cond: [
-              { $gt: ["$discount.amount", 0] },
+              { $gt: ["$discountSafe.amount", 0] },
               {
                 $cond: [
-                  { $eq: ["$discount.type", "percentage"] },
+                  { $eq: ["$discountSafe.type", "percentage"] },
                   {
                     $multiply: [
                       "$pricePerNight",
                       {
-                        $subtract: [1, { $divide: ["$discount.amount", 100] }],
+                        $subtract: [
+                          1,
+                          { $divide: ["$discountSafe.amount", 100] },
+                        ],
                       },
                     ],
                   },
                   {
                     $max: [
                       0,
-                      { $subtract: ["$pricePerNight", "$discount.amount"] },
+                      { $subtract: ["$pricePerNight", "$discountSafe.amount"] },
                     ],
                   },
                 ],
@@ -115,7 +123,7 @@ export const getRoomsByHotel = async (req, res) => {
               "$pricePerNight",
             ],
           },
-          hasDiscount: { $gt: ["$discount.amount", 0] },
+          hasDiscount: { $gt: ["$discountSafe.amount", 0] },
         },
       },
       { $project: { reviews: 0, __v: 0 } },
@@ -217,30 +225,38 @@ export const getRooms = async (req, res) => {
       },
       {
         $addFields: {
-          avgRating: {
-            $ifNull: [{ $arrayElemAt: ["$reviews.avgRating", 0] }, 0],
+          discountSafe: {
+            $cond: [
+              { $or: [{ $eq: ["$discount", null] }, { $not: ["$discount"] }] },
+              { amount: 0, type: "fixed" },
+              "$discount",
+            ],
           },
-          totalReviews: {
-            $ifNull: [{ $arrayElemAt: ["$reviews.totalReviews", 0] }, 0],
-          },
+        },
+      },
+      {
+        $addFields: {
           finalPrice: {
             $cond: [
-              { $gt: ["$discount.amount", 0] },
+              { $gt: ["$discountSafe.amount", 0] },
               {
                 $cond: [
-                  { $eq: ["$discount.type", "percentage"] },
+                  { $eq: ["$discountSafe.type", "percentage"] },
                   {
                     $multiply: [
                       "$pricePerNight",
                       {
-                        $subtract: [1, { $divide: ["$discount.amount", 100] }],
+                        $subtract: [
+                          1,
+                          { $divide: ["$discountSafe.amount", 100] },
+                        ],
                       },
                     ],
                   },
                   {
                     $max: [
                       0,
-                      { $subtract: ["$pricePerNight", "$discount.amount"] },
+                      { $subtract: ["$pricePerNight", "$discountSafe.amount"] },
                     ],
                   },
                 ],
@@ -248,7 +264,7 @@ export const getRooms = async (req, res) => {
               "$pricePerNight",
             ],
           },
-          hasDiscount: { $gt: ["$discount.amount", 0] },
+          hasDiscount: { $gt: ["$discountSafe.amount", 0] },
         },
       },
       // Remove internal fields
@@ -276,6 +292,17 @@ export const getRooms = async (req, res) => {
     });
   }
 };
+
+export const getRoomTypes = async (req, res) => {
+  try {
+    const types = await Room.distinct("roomType");
+    res.json({ success: true, data: types });
+  } catch (error) {
+    console.error("getRoomTypes error:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
 
 
 // Create room for hotel (owner only)

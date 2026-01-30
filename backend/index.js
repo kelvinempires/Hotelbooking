@@ -15,7 +15,6 @@ const __dirname = dirname(__filename);
 
 const app = express();
 
-app.use(clerkMiddleware());
 
 // CORS configuration for Vite frontend
 app.use(
@@ -28,6 +27,9 @@ app.use(
 );
 
 app.use(express.json());
+
+app.use(clerkMiddleware());
+
 
 // Static folders
 app.use(express.static("public"));
