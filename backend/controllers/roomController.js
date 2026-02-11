@@ -279,17 +279,6 @@ export const getRooms = async (req, res) => {
   }
 };
 
-export const getRoomTypes = async (req, res) => {
-  try {
-    const types = await Room.distinct("roomType");
-    res.json({ success: true, data: types });
-  } catch (error) {
-    console.error("getRoomTypes error:", error);
-    res.status(500).json({ message: error.message });
-  }
-};
-
-
 
 // Create room for hotel (owner only)
 // @route   POST /api/rooms
