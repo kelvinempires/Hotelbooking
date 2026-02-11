@@ -1,0 +1,15 @@
+[33m844b205[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmaster[m[33m, [m[1;31morigin/master[m[33m)[m feat: enhance room pricing logic and add room types endpoint
+[33m2433eee[m fix: reorder protected route for my-rooms to ensure correct routing
+[33m1b28c31[m feat: integrate Clerk Express SDK for improved authentication handling
+[33m7ab9346[m feat: enhance room booking form with guest name and phone inputs
+[33mfa3265e[m Adjust initial booki \setup for hotel booking app
+[33me2ff046[m Refactor code structure for improved readability and maintainability
+[33m61b12cc[m all rooms api intigration
+[33m4fbb3a4[m feat: add room retrieval and management routes for enhanced functionality
+[33m5e11f48[m Refactor code structure for improved readability and maintainability
+[33m84a0ce5[m feat: add API service and hooks for hotels and rooms
+[33mad3e1be[m feat: add routes for dashboard, seed, and upload functionalities; implement database seeding with hotel, room, and booking data
+[33m8fe280a[m fix: update condition to show hotel registration component on owner page
+[33mbf02331[m feat: initialize backend with routes for hotels, newsletters, offers, rooms, and testimonials
+[33mf7b285f[m remove unused font classes for Playfair and Prata from index.css
+[33m1d16ef3[m hotel booking app frontend implementation

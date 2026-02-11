@@ -1,7 +1,7 @@
 import Booking from "../models/Booking.js";
 import Room from "../models/Room.js";
 import Hotel from "../models/Hotel.js";
-
+import { users } from "@clerk/clerk-sdk-node";
 // Get public booking (limited information)
 export const getPublicBooking = async (req, res) => {
   try {
@@ -132,13 +132,21 @@ export const getMyBookings = async (req, res) => {
   try {
     const { page = 1, limit = 10, status } = req.query;
 
-    // Get user email from Clerk auth
-    const guestEmail = req.auth.user.primaryEmailAddress.emailAddress;
+    // Clerk backend only gives userId
+    const userId = req.auth?.userId;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    // Fetch full user to get email
+    const clerkUser = await users.getUser(userId);
+    const guestEmail = clerkUser.emailAddresses[0].emailAddress;
 
     const filter = { guestEmail };
     if (status) filter.status = status;
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const skip = (page - 1) * limit;
 
     const bookings = await Booking.find(filter)
       .populate("room hotel")
@@ -152,19 +160,15 @@ export const getMyBookings = async (req, res) => {
       success: true,
       data: bookings,
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page: Number(page),
+        limit: Number(limit),
         total,
-        pages: Math.ceil(total / parseInt(limit)),
+        pages: Math.ceil(total / limit),
       },
     });
   } catch (error) {
     console.error("Get my bookings error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      error: error.message,
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -230,17 +234,15 @@ export const getBookingById = async (req, res) => {
     const booking = await Booking.findById(id).populate("room hotel");
 
     if (!booking) {
-      return res.status(404).json({
-        success: false,
-        message: "Booking not found",
-      });
+      return res
+        .status(404)
+        .json({ success: false, message: "Booking not found" });
     }
 
-    // Get user email from Clerk auth
-    const userEmail = req.auth.user.primaryEmailAddress.emailAddress;
+    const userId = req.auth?.userId;
+    const clerkUser = await users.getUser(userId);
+    const userEmail = clerkUser.emailAddresses[0].emailAddress;
 
-    // Check if user has permission to view this booking
-    // Users can only view their own bookings unless they're admin
     if (booking.guestEmail !== userEmail) {
       return res.status(403).json({
         success: false,
@@ -248,17 +250,10 @@ export const getBookingById = async (req, res) => {
       });
     }
 
-    res.status(200).json({
-      success: true,
-      data: booking,
-    });
+    res.status(200).json({ success: true, data: booking });
   } catch (error) {
     console.error("Get booking by ID error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      error: error.message,
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -414,24 +409,20 @@ export const cancelBooking = async (req, res) => {
     const booking = await Booking.findById(id);
 
     if (!booking) {
-      return res.status(404).json({
-        success: false,
-        message: "Booking not found",
-      });
+      return res
+        .status(404)
+        .json({ success: false, message: "Booking not found" });
     }
 
-    // Get user email from Clerk auth
-    const userEmail = req.auth.user.primaryEmailAddress.emailAddress;
+    const clerkUser = await users.getUser(req.auth.userId);
+    const userEmail = clerkUser.emailAddresses[0].emailAddress;
 
-    // Check if user has permission to cancel this booking
     if (booking.guestEmail !== userEmail) {
-      return res.status(403).json({
-        success: false,
-        message: "Not authorized to cancel this booking",
-      });
+      return res
+        .status(403)
+        .json({ success: false, message: "Not authorized" });
     }
 
-    // Check if booking can be cancelled (e.g., not too close to check-in)
     const checkIn = new Date(booking.checkInDate);
     const now = new Date();
     const hoursUntilCheckIn = (checkIn - now) / (1000 * 60 * 60);
@@ -439,8 +430,7 @@ export const cancelBooking = async (req, res) => {
     if (hoursUntilCheckIn < 24) {
       return res.status(400).json({
         success: false,
-        message:
-          "Bookings can only be cancelled at least 24 hours before check-in",
+        message: "Bookings can only be cancelled 24 hours before check-in",
       });
     }
 
@@ -457,11 +447,7 @@ export const cancelBooking = async (req, res) => {
     });
   } catch (error) {
     console.error("Cancel booking error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      error: error.message,
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 

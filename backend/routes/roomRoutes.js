@@ -10,13 +10,15 @@ import {
   deleteRoom,
   getRooms,
   addRoomReview,
-  checkRoomAvailability, // Add this
+  checkRoomAvailability,
+  getRoomTypes, // Add this
 } from "../controllers/roomController.js";
 import { protect } from "../middleware/auth.js";
 
 const router = express.Router();
 
 // Public routes
+router.get("/types", getRoomTypes);
 router.get("/", getRooms);
 router.get("/hotel/:hotelId", getRoomsByHotel);
 
