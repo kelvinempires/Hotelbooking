@@ -268,7 +268,9 @@ export const getRooms = async (req, res) => {
       pages: Math.ceil(total / parseInt(limit)),
       data: roomsAggregate,
     });
+    
   } catch (error) {
+      console.error("🔥 GET ROOMS ERROR:", error);
     res.status(500).json({
       success: false,
       message: "Error fetching rooms",
@@ -276,6 +278,17 @@ export const getRooms = async (req, res) => {
     });
   }
 };
+
+export const getRoomTypes = async (req, res) => {
+  try {
+    const types = await Room.distinct("roomType");
+    res.json({ success: true, data: types });
+  } catch (error) {
+    console.error("getRoomTypes error:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
 
 
 // Create room for hotel (owner only)
