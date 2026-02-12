@@ -11,6 +11,9 @@ import LayOut from "./pages/HotelOwner.jsx/LayOut";
 import Dashboard from "./pages/HotelOwner.jsx/Dashboard";
 import AddRoom from "./pages/HotelOwner.jsx/AddRoom";
 import ListRoom from "./pages/HotelOwner.jsx/ListRoom";
+import About from "./pages/About.jsx";
+import Experience from "./pages/Experience.jsx";
+
 
 const App = () => {
   const location = useLocation();
@@ -45,6 +48,9 @@ const App = () => {
           <Route path="/rooms" element={<AllRooms />} />
           <Route path="/rooms/:id" element={<RoomDetails />} />
           <Route path="/my-bookings" element={<MyBookings />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/experience" element={<Experience />} />
+
           <Route path="/owner" element={<LayOut />}>
             <Route
               index
