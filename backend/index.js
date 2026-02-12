@@ -27,7 +27,7 @@ app.use(express.json());
 
 // Static folders
 app.use(express.static("public"));
-app.use("/uploads", express.static("public/uploads"));   // <-- this is important for image access
+app.use("/uploads", express.static("public/uploads"));   // <-- this is for image access
 
 // Import routes
 import hotelRoutes from "./routes/hotelRoutes.js";
