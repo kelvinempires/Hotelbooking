@@ -84,10 +84,6 @@ mongoose
   .connect(process.env.MONGODB_URI || "mongodb://localhost:27017/hotel-booking")
   .then(() => {
     console.log("Connected to MongoDB");
-    app.listen(PORT, () => {
-      console.log(`Server running at http://localhost:${PORT}`);
-      console.log(`Frontend URL: ${process.env.FRONTEND_URL}`);
-    });
   })
   .catch((error) => {
     console.error("Database connection error:", error);
