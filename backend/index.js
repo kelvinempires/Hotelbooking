@@ -13,6 +13,9 @@ dotenv.config();
 
 const app = express();
 
+app.use(express.json());
+
+
 // CORS configuration for Vite frontend
 app.use(
   cors({
@@ -23,7 +26,6 @@ app.use(
   })
 );
 
-app.use(express.json());
 
 // Static folders
 app.use(express.static("public"));
